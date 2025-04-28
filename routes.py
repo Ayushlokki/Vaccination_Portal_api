@@ -3,6 +3,8 @@ from datetime import date, timedelta
 from models import db, Student, VaccinationDrive, VaccinationRecord
 from datetime import datetime
 
+import csv
+import io
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -103,7 +105,7 @@ def add_vaccination_record():
        
  
 @bp.route('/vaccination_upload', methods=['POST'])
-    def bulk_vaccination_upload():
+def bulk_vaccination_upload():
         """
         POST /bulk/vaccination_upload
         Expects multipart/form-data with a file field named 'file' containing CSV.
