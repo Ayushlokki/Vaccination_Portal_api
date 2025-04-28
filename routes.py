@@ -106,11 +106,6 @@ def add_vaccination_record():
  
 @bp.route('/vaccination_upload', methods=['POST'])
 def bulk_vaccination_upload():
-        """
-        POST /bulk/vaccination_upload
-        Expects multipart/form-data with a file field named 'file' containing CSV.
-        CSV headers must include: name, class, vaccination_status, vaccine_name, vaccination_date
-        """
         # 1️⃣ Validate upload
         if 'file' not in request.files:
             return jsonify({"error": "CSV file is required"}), 400
