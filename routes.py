@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import date, timedelta
-from models import db, Student, VaccinationDrive, VaccinationRecord
+from models import db, Student, VaccinationDrive
+# VaccinationRecord
 from datetime import datetime
 
 import csv
@@ -72,7 +73,8 @@ def add_vaccination_record():
             name=student_name,
             student_class=student_class,
             vaccine_name=None,  
-            vaccination_date=None
+            vaccination_date=None,
+            vaccination_status = vaccination_status
         )
         db.session.add(student)
         db.session.commit()  # Commit to create the new student
@@ -174,10 +176,10 @@ def bulk_vaccination_upload():
   
 
 # Vaccination Drive
-@bp.route("/drives", methods=["POST"])
+@bp.route("/adddrives", methods=["POST"])
 def create_drive():
     data = request.json
-    drive_date = date.fromisoformat(data["drive_date"])
+    drive_date = datetime.strptime(data["drive_date"],"%Y-%m-%d").date()
     if drive_date < date.today() + timedelta(days=15):
         return jsonify({"error": "Drives must be scheduled at least 15 days in advance"}), 400
 
@@ -195,9 +197,42 @@ def create_drive():
     db.session.commit()
     return jsonify({"message": "Drive created"})
 
+@bp.route("/drives/<int:id>", methods=["PUT"])
+def update_drive(id):
+    data = request.json
+    new_drive_date = datetime.strptime(data["drive_date"], "%Y-%m-%d").date()
+
+    if new_drive_date < date.today() + timedelta(days=15):
+        return jsonify({"error": "Drives must be scheduled at least 15 days in advance"}), 400
+
+    drive = VaccinationDrive.query.get_or_404(id)
+
+    # If the new date is different, check for duplicates
+    if drive.drive_date != new_drive_date:
+        existing_drive = VaccinationDrive.query.filter_by(drive_date=new_drive_date).first()
+        if existing_drive:
+            return jsonify({"error": "Another drive is already scheduled on this date"}), 400
+
+    # Update fields
+    drive.vaccine_name = data["vaccine_name"]
+    drive.drive_date = new_drive_date
+    drive.available_doses = data["available_doses"]
+    drive.applicable_classes = ','.join(data["applicable_classes"])
+
+    db.session.commit()
+    return jsonify({"message": "Drive updated"})
+
+@bp.route("/drives", methods=["GET"])
+def getDrives():
+    driveData = VaccinationDrive.query.all()
+    return jsonify([{"id": s.id,
+            "class": s.applicable_classes,
+            "vaccine_name":s.vaccine_name,
+            "vaccine_date":s.vaccination_date,
+            "doses":s.available_doses} for s in driveData])
 # Dashboard Metrics
-@bp.route("/metrics", methods=["GET"])
-def get_metrics():
+# @bp.route("/metrics", methods=["GET"])
+# def get_metrics():
     total_students = Student.query.count()
     vaccinated = VaccinationRecord.query.count()
     upcoming_drives = VaccinationDrive.query.filter(
