@@ -131,16 +131,17 @@ def bulk_vaccination_upload():
             status    = row.get('vaccination_status')
             vaccine   = row.get('vaccine_name')
             vac_date  = row.get('vaccination_date')
+            
 
             # Basic validation
             if not (name and cls and status):
                 results.append({"row": row_num, "error": "Missing required fields"})
                 continue
-
+            print("status.lower()",status.lower())
             # Find or create student
             student = Student.query.filter_by(name=name, student_class=cls).first()
             if not student:
-                student = Student(name=name, student_class=cls)
+                student = Student(name=name, student_class=cls,vaccination_status=status.lower())
                 db.session.add(student)
                 db.session.commit()  # commit so student.id exists
 
@@ -159,6 +160,7 @@ def bulk_vaccination_upload():
                 try:
                     student.vaccination_date = datetime.strptime(vac_date, "%Y-%m-%d").date()
                     student.vaccine_name    = vaccine
+                    student.vaccination_status = 'yes' 
                 except ValueError:
                     results.append({"row": row_num, "error": "Invalid date format; use YYYY-MM-DD"})
                     continue
@@ -167,6 +169,7 @@ def bulk_vaccination_upload():
                 # clear any existing vaccine info
                 student.vaccine_name    = None
                 student.vaccination_date = None
+                student.vaccination_status = 'no' 
 
             db.session.commit()
             results.append({"row": row_num, "message": "OK"})
@@ -178,20 +181,22 @@ def bulk_vaccination_upload():
 # Vaccination Drive
 @bp.route("/adddrives", methods=["POST"])
 def create_drive():
-    data = request.json
-    drive_date = datetime.strptime(data["drive_date"],"%Y-%m-%d").date()
+    print("dtart")
+    data = request.get_json()
+    print("DEBUG - Received JSON:", data) 
+    drive_date = datetime.strptime(data.get("drive_date"),"%Y-%m-%d").date()
     if drive_date < date.today() + timedelta(days=15):
         return jsonify({"error": "Drives must be scheduled at least 15 days in advance"}), 400
 
-    existing_drive = VaccinationDrive.query.filter_by(drive_date=drive_date).first()
+    existing_drive = VaccinationDrive.query.filter_by(vaccination_date=drive_date).first()
     if existing_drive:
         return jsonify({"error": "Drive already scheduled on this date"}), 400
 
     drive = VaccinationDrive(
-        vaccine_name=data["vaccine_name"],
-        drive_date=drive_date,
-        available_doses=data["available_doses"],
-        applicable_classes=','.join(data["applicable_classes"])
+        vaccine_name=data.get("vaccine_name"),
+        vaccination_date=drive_date,
+        available_doses=data.get("available_doses"),
+        applicable_classes=','.join(data.get("applicable_classes"))
     )
     db.session.add(drive)
     db.session.commit()
@@ -228,7 +233,7 @@ def getDrives():
     return jsonify([{"id": s.id,
             "class": s.applicable_classes,
             "vaccine_name":s.vaccine_name,
-            "vaccine_date":s.vaccination_date,
+            "vaccine_date":s.vaccination_date.strftime("%Y-%m-%d"),
             "doses":s.available_doses} for s in driveData])
 # Dashboard Metrics
 # @bp.route("/metrics", methods=["GET"])
