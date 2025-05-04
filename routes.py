@@ -213,8 +213,8 @@ def update_drive(id):
     drive = VaccinationDrive.query.get_or_404(id)
 
     # If the new date is different, check for duplicates
-    if drive.drive_date != new_drive_date:
-        existing_drive = VaccinationDrive.query.filter_by(drive_date=new_drive_date).first()
+    if drive.vaccination_date != new_drive_date:
+        existing_drive = VaccinationDrive.query.filter_by(vaccination_date=new_drive_date).first()
         if existing_drive:
             return jsonify({"error": "Another drive is already scheduled on this date"}), 400
 
@@ -231,10 +231,43 @@ def update_drive(id):
 def getDrives():
     driveData = VaccinationDrive.query.all()
     return jsonify([{"id": s.id,
-            "class": s.applicable_classes,
+            "applicable_classes": s.applicable_classes,
             "vaccine_name":s.vaccine_name,
-            "vaccine_date":s.vaccination_date.strftime("%Y-%m-%d"),
-            "doses":s.available_doses} for s in driveData])
+            "drive_date":s.vaccination_date.strftime("%Y-%m-%d"),
+            "available_doses":s.available_doses} for s in driveData])
+    
+    
+    
+    
+@bp.route('/reports/vaccinations', methods=['GET'])
+def get_vaccination_report():
+    vaccine_name = request.args.get('vaccine_name', '').strip()
+
+    try:
+        if vaccine_name:
+            students = Student.query.filter(Student.vaccine_name == vaccine_name).all()
+        else:
+            students = Student.query.all()
+
+        result = []
+        for student in students:
+            result.append({
+                'student_name': student.name,
+                'vaccinated': student.vaccination_status,
+                'vaccination_date': student.vaccination_date.isoformat() if student.vaccination_date else None,
+                'vaccine_name': student.vaccine_name or ''
+            })
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({'error': 'Failed to fetch report'}), 500
+
+
+
+
+    
 # Dashboard Metrics
 # @bp.route("/metrics", methods=["GET"])
 # def get_metrics():
