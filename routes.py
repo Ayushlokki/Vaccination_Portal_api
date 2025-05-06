@@ -11,22 +11,21 @@ bp = Blueprint("api", __name__, url_prefix="/api")
 @bp.route("/students", methods=["GET"])
 def get_students():
     students = Student.query.all()
+    if not students:
+        return jsonify({"message": "No students found", "data": []}), 200 
 
-    for s in students:
-        student_data = {
-            "id": s.id,
-            "name": s.name,
-            "class": s.student_class,
-            "vaccine_name":s.vaccine_name,
-            "vaccine_date":s.vaccination_date
+    return jsonify([
+        {
+        "id": s.id,
+        "name": s.name,
+        "class": s.student_class,
+        "vaccinated": s.vaccination_status,
+        "vaccine_name": s.vaccine_name,
+        "vaccine_date": s.vaccination_date.strftime("%Y-%m-%d") if s.vaccination_date else None
+        
         }
-     
-        return jsonify([{"id": s.id,
-            "name": s.name,
-            "class": s.student_class,
-            "vaccine_name":s.vaccine_name,
-            "vaccine_date":s.vaccination_date } for s in students])
-
+        for s in students
+    ])
 @bp.route("/studentdata", methods=["POST"])
 def add_vaccination_record():
     data = request.get_json()
@@ -54,7 +53,7 @@ def add_vaccination_record():
         db.session.commit()
     print("data",vaccination_date,vaccine_name)
 
-    if vaccination_status == "Yes":
+    if vaccination_status == "yes":
         if not vaccine_name or not vaccination_date:
             return jsonify({"error": "Vaccine name and date required"}), 400
 
@@ -106,7 +105,7 @@ def bulk_vaccination_upload():
             if not (name and cls and status):
                 results.append({"row": row_num, "error": "Missing required fields"})
                 continue
-            print("status.lower()",status.lower())
+            print("status.lower()",vac_date)
 
             student = Student.query.filter_by(name=name, student_class=cls).first()
             if not student:
@@ -137,7 +136,10 @@ def bulk_vaccination_upload():
             db.session.commit()
             results.append({"row": row_num, "message": "OK"})
 
-        return jsonify(results), 200
+        return jsonify({
+            "message": "Data Added Successfully",
+            "data": results
+        }), 200
  
   
 @bp.route("/adddrives", methods=["POST"])
@@ -157,7 +159,7 @@ def create_drive():
         vaccine_name=data.get("vaccine_name"),
         vaccination_date=drive_date,
         available_doses=data.get("available_doses"),
-        applicable_classes=','.join(data.get("applicable_classes"))
+        applicable_classes=data.get("applicable_classes")
     )
     db.session.add(drive)
     db.session.commit()
@@ -179,9 +181,9 @@ def update_drive(id):
             return jsonify({"error": "Another drive is already scheduled on this date"}), 400
 
     drive.vaccine_name = data["vaccine_name"]
-    drive.drive_date = new_drive_date
+    drive.vaccination_date = new_drive_date
     drive.available_doses = data["available_doses"]
-    drive.applicable_classes = ','.join(data["applicable_classes"])
+    drive.applicable_classes = data["applicable_classes"]
 
     db.session.commit()
     return jsonify({"message": "Drive updated"})
